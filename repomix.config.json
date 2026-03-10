@@ -1,0 +1,28 @@
+{
+  "output": {
+    "filePath": "repomix-output.md",
+    "style": "markdown",
+    "topFilesLength": 10
+  },
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": [
+      ".env.local",
+      "credentials.json",
+      "token.json",
+      "alumni_raw.csv",
+      "iimu_2025.csv",
+      "iimu_2015.csv",
+      "alumni_clean.json",
+      "alumni_outreach.json",
+      "llm_session_notes.md",
+      "__pycache__",
+      "*.pyc",
+      "repomix-output*",
+      "alumni_raw_sample.csv"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}

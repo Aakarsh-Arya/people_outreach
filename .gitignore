@@ -1,0 +1,28 @@
+# Secrets & credentials
+.env.local
+credentials.json
+client_secret_*.json
+token.json
+
+# Alumni data (confidential)
+alumni_clean*.json
+alumni_clean*.csv
+alumni_raw*.csv
+iimu_*.csv
+
+# Agent & session logs (not for repo)
+AGENT_SUMMARIES*
+llm_session_notes*
+
+# Repomix snapshots
+repomix*.md
+repomix*.txt
+repomix-output.*
+
+# Python environment
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
