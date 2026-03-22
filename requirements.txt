@@ -2,6 +2,7 @@ google-auth-oauthlib>=1.0.0
 google-api-python-client>=2.100.0
 gspread>=5.12.0
 requests>=2.31.0
+httpx>=0.27.0
 tavily-python>=0.3.0
 apify-client>=1.6.0
 openai>=1.12.0

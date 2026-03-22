@@ -6,6 +6,100 @@ Orchestrates Phase 1 -> Phase 2 (Phase 3 runs in Apps Script).
 import sys
 
 
+def _configure_realtime_output() -> None:
+    """Force line-buffered, write-through stdout/stderr for streaming logs."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(line_buffering=True, write_through=True)
+
+
+def _parse_phase2_args(raw_args):
+    limit = None
+    start_row = None
+    tab_name = None
+    force = False
+    positionals = []
+
+    index = 0
+    while index < len(raw_args):
+        token = raw_args[index]
+        if token == "--count":
+            limit = int(raw_args[index + 1])
+            index += 2
+        elif token == "--start":
+            start_row = int(raw_args[index + 1])
+            index += 2
+        elif token == "--tab":
+            tab_name = raw_args[index + 1]
+            index += 2
+        elif token == "--force":
+            force = True
+            index += 1
+        else:
+            positionals.append(token)
+            index += 1
+
+    if limit is None:
+        limit = int(positionals[0]) if len(positionals) > 0 else 0
+    if start_row is None:
+        start_row = int(positionals[1]) if len(positionals) > 1 else 1
+
+    return limit, start_row, tab_name, force
+
+
+def _parse_phase1_args(raw_args):
+    csv_path = None
+    tab_name = None
+    force_clear = False
+    positionals = []
+
+    index = 0
+    while index < len(raw_args):
+        token = raw_args[index]
+        if token == "--tab":
+            tab_name = raw_args[index + 1]
+            index += 2
+        elif token == "--force-clear":
+            force_clear = True
+            index += 1
+        else:
+            positionals.append(token)
+            index += 1
+
+    if positionals:
+        csv_path = positionals[0]
+
+    return csv_path, tab_name, force_clear
+
+
+def _parse_cohort_run_args(raw_args):
+    cohort_year = None
+    index = 0
+    while index < len(raw_args):
+        token = raw_args[index]
+        if token == "--cohort":
+            cohort_year = raw_args[index + 1]
+            index += 2
+        else:
+            raise ValueError(f"Unknown cohort-run option: {token}")
+    return cohort_year
+
+
+def _parse_sync_manifest_args(raw_args):
+    cohort_year = None
+    index = 0
+    while index < len(raw_args):
+        token = raw_args[index]
+        if token == "--cohort":
+            cohort_year = raw_args[index + 1]
+            index += 2
+        else:
+            raise ValueError(f"Unknown sync-manifest option: {token}")
+    return cohort_year
+
+
 def print_banner():
     print()
     print("=" * 60)
@@ -17,16 +111,17 @@ def print_banner():
 
 def run_all(csv_path=None):
     """Run Phase 1 then Phase 2 sequentially."""
-    from phase1_contact_resolution import run_phase1
+    from phase1_contact_resolution import infer_tab_name_from_csv, run_phase1
     from phase2_orchestrator import run_phase2
 
     print_banner()
     print("Running full pipeline: Phase 1 -> Phase 2")
     print("(Phase 3 runs separately in Google Apps Script)\n")
 
-    run_phase1(csv_path=csv_path)
+    target_tab = infer_tab_name_from_csv(csv_path)
+    run_phase1(csv_path=csv_path, tab_name=target_tab)
     print()
-    run_phase2(source="sheet")
+    run_phase2(source="sheet", tab_name=target_tab)
 
     print("\n" + "=" * 60)
     print("PIPELINE COMPLETE")
@@ -41,9 +136,15 @@ def print_usage():
     print("  python main.py research NAME     -- Research one alumni by name from alumni_clean.json")
     print("  python main.py phase2 [N] [S]    -- Phase 2: Research + Gen emails (local JSON mode)")
     print("                                      Optional N = count, S = 1-based start row")
-    print("  python main.py phase2-sheet [N] [S]  -- Phase 2: Same but reads/writes Google Sheet")
-    print("  python main.py phase1 [CSV]      -- Phase 1: CSV -> People API -> Sheet")
-    print("  python main.py phase1-retry      -- Retry guessed/ambiguous Phase 1 rows in Sheet")
+    print("  python main.py phase2-sheet [N] [S] [--tab TAB] [--count N] [--start S] [--force]")
+    print("                                      Phase 2 in Google Sheet mode with optional tab override")
+    print("                                      --force bypasses checkpoint prompt")
+    print("  python main.py phase1 [CSV] [--tab TAB] [--force-clear]")
+    print("                                      Phase 1: CSV -> People API -> idempotent sheet upsert")
+    print("  python main.py phase1-retry [--tab TAB]")
+    print("                                      Retry guessed/ambiguous Phase 1 rows in Sheet")
+    print("  python main.py cohort-run [--cohort YEAR] -- Run Phase 1/2 for one manifest cohort")
+    print("  python main.py sync-manifest [--cohort YEAR] -- Refresh manifest counts/status from sheet tabs")
     print("  python main.py all [CSV]         -- Full: Phase 1 + Phase 2 (sheet mode)")
     print()
     print("Phase 3 (sending) runs in Google Apps Script -- see apps_script_sender.js")
@@ -127,7 +228,11 @@ def run_research_one(name_query: str):
     # Step 2: Generate email
     print("\n--- GENERATING EMAIL ---")
     if is_profile_usable(profile):
-        subject, body = generate_email_from_profile(alumnus["name"], profile)
+        subject, body = generate_email_from_profile(
+            alumnus["name"],
+            profile,
+            enrichment_source="llm_research",
+        )
     else:
         subject, body = generate_email_base_template(alumnus["name"], alumnus.get("batch", ""))
 
@@ -141,6 +246,8 @@ def run_research_one(name_query: str):
 
 
 if __name__ == "__main__":
+    _configure_realtime_output()
+
     if len(sys.argv) < 2:
         print_usage()
         sys.exit(0)
@@ -154,24 +261,42 @@ if __name__ == "__main__":
         elif command == "phase1":
             from phase1_contact_resolution import run_phase1
             print_banner()
-            csv_path = sys.argv[2] if len(sys.argv) > 2 else None
-            run_phase1(csv_path=csv_path)
+            csv_path, tab_name, force_clear = _parse_phase1_args(sys.argv[2:])
+            run_phase1(csv_path=csv_path, tab_name=tab_name, force_clear=force_clear)
         elif command == "phase1-retry":
             from phase1_contact_resolution import run_phase1_retry
             print_banner()
-            run_phase1_retry()
+            tab_name = None
+            retry_args = sys.argv[2:]
+            idx = 0
+            while idx < len(retry_args):
+                if retry_args[idx] == "--tab":
+                    tab_name = retry_args[idx + 1]
+                    idx += 2
+                else:
+                    raise ValueError(f"Unknown phase1-retry option: {retry_args[idx]}")
+                    idx += 1
+            run_phase1_retry(tab_name=tab_name)
         elif command == "phase2":
             from phase2_orchestrator import run_phase2
             print_banner()
-            lim = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-            start_row = int(sys.argv[3]) if len(sys.argv) > 3 else 1
-            run_phase2(source="json", limit=lim, start_row=start_row)
+            lim, start_row, tab_name, force = _parse_phase2_args(sys.argv[2:])
+            run_phase2(source="json", limit=lim, start_row=start_row, tab_name=tab_name, force=force)
         elif command == "phase2-sheet":
             from phase2_orchestrator import run_phase2
             print_banner()
-            lim = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-            start_row = int(sys.argv[3]) if len(sys.argv) > 3 else 1
-            run_phase2(source="sheet", limit=lim, start_row=start_row)
+            lim, start_row, tab_name, force = _parse_phase2_args(sys.argv[2:])
+            run_phase2(source="sheet", limit=lim, start_row=start_row, tab_name=tab_name, force=force)
+        elif command == "cohort-run":
+            from cohort_runner import run_cohort
+            print_banner()
+            cohort_year = _parse_cohort_run_args(sys.argv[2:])
+            run_cohort(cohort_year=cohort_year)
+        elif command == "sync-manifest":
+            from cohort_runner import sync_manifest
+            print_banner()
+            cohort_year = _parse_sync_manifest_args(sys.argv[2:])
+            sync_manifest(cohort_year=cohort_year)
         elif command == "test":
             run_test()
         elif command == "research":

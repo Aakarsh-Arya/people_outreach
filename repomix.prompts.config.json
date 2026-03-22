@@ -1,6 +1,6 @@
 {
   "output": {
-    "filePath": "repomix-output.md",
+    "filePath": "repomix-prompts-output.md",
     "style": "markdown",
     "topFilesLength": 10
   },
@@ -22,7 +22,6 @@
       "scripts/**",
       "maintenance/**",
       "debug_logs/**",
-      "*.txt",
       "cohorts/**",
       "repomix-output*",
       "alumni_raw_sample.csv"

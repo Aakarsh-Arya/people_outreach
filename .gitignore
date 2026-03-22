@@ -13,11 +13,53 @@ iimu_*.csv
 # Agent & session logs (not for repo)
 AGENT_SUMMARIES*
 llm_session_notes*
+current_steps.txt
+
+# Local backup mirror
+backup/
+backups/
+
+# Senior outreach local notes
+Senior_outreach_management_logs/
 
 # Repomix snapshots
 repomix*.md
 repomix*.txt
 repomix-output.*
+
+# Runtime logs and checkpoints
+logs/
+debug_logs/
+*.log
+phase2_log_*.txt
+scratch/
+scripts/
+maintenance/
+progress.json
+tavily_cache.json
+
+# Cohort manifests and local cohort CSVs
+cohorts/
+cohorts/*.csv
+cohorts/manifest.json
+batch_csv/
+*.csv
+
+# Prompt files (runtime local only)
+prompts/*.txt
+
+# Manual workflow operational files (personal data, do not commit)
+manual_workflow/research_queue.md
+manual_workflow/ingest_queue.md
+manual_workflow/review_queue.md
+manual_workflow/email_queue.md
+manual_workflow/manual_overrides.md
+manual_workflow/logs/
+manual_workflow/system_prompt_research.md
+manual_workflow/system_prompt_email.md
+
+# VS Code agent briefs
+vscode_agent_brief*.md
 
 # Python environment
 __pycache__/

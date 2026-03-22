@@ -18,12 +18,10 @@ OUTPUT_JSON = BASE_DIR / "alumni_clean.json"
 
 # ─── Column indices (0-based, matches actual CSV) ─────────────────────────────
 COL_PROFILE_URL  = 0
-COL_IMAGE_URL    = 1   # dropped
 COL_NAME         = 2
 COL_BATCH        = 3
 COL_ROLE         = 4
 COL_LOCATION     = 5
-COL_LOCATION_URL = 6   # dropped
 
 # Junk role values to blank out
 JUNK_ROLES = {

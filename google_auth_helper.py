@@ -5,6 +5,7 @@ Handles OAuth2 flow for People API and Sheets API.
 
 import os
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -24,8 +25,22 @@ def get_credentials():
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except RefreshError as exc:
+                if os.path.exists(config.GOOGLE_TOKEN_FILE):
+                    os.remove(config.GOOGLE_TOKEN_FILE)
+                print(f"[Auth] Cached token invalid or revoked, starting re-auth flow: {exc}")
+                creds = None
         else:
+            if not os.path.exists(config.GOOGLE_CREDENTIALS_FILE):
+                raise FileNotFoundError(
+                    "Missing Google OAuth client file. Set GOOGLE_CREDENTIALS_FILE in .env.local, "
+                    "place credentials.json in the project root, or keep a single "
+                    "client_secret_*.json file there."
+                )
+
+        if not creds or not creds.valid:
             if not os.path.exists(config.GOOGLE_CREDENTIALS_FILE):
                 raise FileNotFoundError(
                     "Missing Google OAuth client file. Set GOOGLE_CREDENTIALS_FILE in .env.local, "
